@@ -5,12 +5,17 @@
 #define BUFFSIZE 1024
 
 int sd;//socket descriptor
+int fdImage;//file descriptor for disk image
+char name[1024];//name of file system image
+struct sockaddr_in addr;
+
+
 
 int main(int argc, char *argv[])
 {
-	if(argc!=2)
+	if(argc!=3)
 	{
-		fprintf(stderr,"Usage: server [portnum]\n");
+		fprintf(stderr,"Usage: server [portnum] [file-system-image]\n");
 		exit(0);
 	}
 
@@ -37,7 +42,8 @@ int main(int argc, char *argv[])
 		}
 
 	}
-
 	return 0;
 }
+
+
 
