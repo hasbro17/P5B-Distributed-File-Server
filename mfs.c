@@ -127,6 +127,7 @@ int MFS_Creat(int pinum, int type, char *name)
 	msg.block=-1;
 	msg.retCode=-1;
 	msg.stat.type=type;
+	msg.type=type;
 	sprintf(msg.name,name);
 		
 	send_and_recieve((char*)&msg);

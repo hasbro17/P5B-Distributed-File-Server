@@ -8,7 +8,8 @@
 // Inodes start at block 3.
 // Block 4 is for data block bitmap
 
-#define MFS_DIRECTORY    (0)
+#define MFS_UNUSED       (0)
+#define MFS_DIRECTORY    (2)
 #define MFS_REGULAR_FILE (1)
 
 #define MFS_BLOCK_SIZE   (4096)
@@ -38,13 +39,21 @@ typedef struct __MFS_DirEnt_t {
 
 //inode structure
 typedef struct __inode_t {
-	MFS_Stat_t stat; //inode metadata
+//	MFS_Stat_t stat; //inode metadata
+	int type;
+	int size;
 	int blockPtrs[14];//direct block pointers
 } inode_t;
 
+#define NUM_DIR_ENTS ( MFS_BLOCK_SIZE / (sizeof(MFS_DirEnt_t)) )//number of directory entries in a data block
+
+//directory data block 64 directory entries of 64bytes each
+typedef struct __dir_t {
+	MFS_DirEnt_t dirEnt[NUM_DIR_ENTS];
+} dir_t;
+
 //To tell what type of function is being used
 typedef enum __func_t{
-	INIT,
 	LOOKUP,
 	STAT,
 	WRITE,
@@ -58,6 +67,7 @@ typedef enum __func_t{
 typedef struct __msg_t {
 	int pinum;//parent inode number
 	int inum;
+	int type;
 	int block;// block number
 	int retCode;//return code from server 0:sucess -1:failure
 	char name[60];//path name
@@ -79,7 +89,7 @@ typedef struct __msg_t {
 //Byte offset for the bit corresponding to block b
 #define BYOFF_BIT(b) ( b/8 + 3*MFS_BLOCK_SIZE)
 
-//Bit offset within the byte for block b
+//Bit offset within the byte in bitmap for block b
 #define BIOFF_BIT(b) ( b%8 )
 
 
