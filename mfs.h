@@ -45,9 +45,12 @@ typedef struct __inode_t {
 	int blockPtrs[14];//direct block pointers
 } inode_t;
 
-#define NUM_DIR_ENTS ( MFS_BLOCK_SIZE / (sizeof(MFS_DirEnt_t)) )//number of directory entries in a data block
 
+//number of directory entries in a data block: 64
+#define NUM_DIR_ENTS ( MFS_BLOCK_SIZE / (sizeof(MFS_DirEnt_t)) )
 //directory data block 64 directory entries of 64bytes each
+
+
 typedef struct __dir_t {
 	MFS_DirEnt_t dirEnt[NUM_DIR_ENTS];
 } dir_t;
@@ -76,9 +79,14 @@ typedef struct __msg_t {
 	MFS_Stat_t stat;
 } msg_t;
 
+//Maximum data blocks 1024
+#define MAXDATABLOCKS 1024
+
+//Number of inodes: 64
+#define NUMINODES ( MFS_BLOCK_SIZE/(sizeof(inode_t)) ) 
 
 // Byte offset for supernode block
-#define BYOFF_SUPER MFS_BLOCK_SIZE//FIXME redundant
+#define BYOFF_SUPER MFS_BLOCK_SIZE//redundant
 
 // Byte offset for inode i : inodes numbered from 0-63
 #define BYOFF_INODE(i) ( sizeof(inode_t)*i + 2*MFS_BLOCK_SIZE )
@@ -87,7 +95,7 @@ typedef struct __msg_t {
 #define BYOFF_BLOCK(b) ( b*MFS_BLOCK_SIZE + 4*MFS_BLOCK_SIZE )
 
 //Byte offset for the bit corresponding to block b
-#define BYOFF_BIT(b) ( b/8 + 3*MFS_BLOCK_SIZE)
+#define BYOFF_BIT(b) ( (b/8) + (3*MFS_BLOCK_SIZE) )
 
 //Bit offset within the byte in bitmap for block b
 #define BIOFF_BIT(b) ( b%8 )

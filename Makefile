@@ -30,4 +30,4 @@ client.o: client.c
 #	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f server.o udp.o mfs.o server client libmfs.so
+	rm -f server.o client.o udp.o mfs.o server client libmfs.so myFS1.img

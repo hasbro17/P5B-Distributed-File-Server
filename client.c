@@ -3,7 +3,8 @@
 #include "mfs.h"
 
 
-#define BUFFSIZE 1024
+#define BUFFER_SIZE (4096)
+char buffer[BUFFER_SIZE];
 
 int main(int argc, char *argv[])
 {
@@ -24,7 +25,9 @@ int main(int argc, char *argv[])
 	assert(rc==0);
 	//What to do here to test out the server?
 
+    //rc = MFS_Creat(0, MFS_DIRECTORY, "dir2\0");
+    rc = MFS_Creat(0, MFS_REGULAR_FILE, "file1\0");
+	printf("Create returned: %d\n",rc);
+
 	return 0;
-
-
 }
