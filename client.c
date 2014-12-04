@@ -40,7 +40,11 @@ int main(int argc, char *argv[])
 	rc = MFS_Creat(2, MFS_REGULAR_FILE, "file1\0");
 	printf("Create file returned: %d\n",rc);
 
-/*
+
+	rc=MFS_Unlink(1,"dir3\0");
+	printf("Unlink dir3 returned: %d\n",rc);
+
+
 	inum=MFS_Lookup(2,"file1\0");
 	printf("Lookup file1 in pinum 2 returned:%d\n",inum);
 
@@ -50,7 +54,16 @@ int main(int argc, char *argv[])
 	
 	inum=MFS_Lookup(2,"file1\0");
 	printf("Lookup after unlink of file1 in pinum 2 returned:%d\n",inum);
-*/
+
+
+	rc=MFS_Unlink(1,"dir3\0");
+	printf("Unlink dir3 returned: %d\n",rc);
+
+
+	rc=MFS_Creat(0, MFS_DIRECTORY, "dir4\0");
+	printf("Create dir4 in inum:%d returned: %d\n",0, rc);
+
+/*
     char *buff = malloc(4096);
     sprintf(buff, "File created successfully");
     rc = MFS_Write(3, buff, 0);
@@ -62,7 +75,7 @@ int main(int argc, char *argv[])
 		printf("Problem\n");
         exit(-1);
     }
-
+*/
 	MFS_Shutdown();
 	return 0;
 }

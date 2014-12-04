@@ -116,6 +116,81 @@ int allocDataBlock()
 
 }
 
+//clears bit map for that data block and updates superblock
+void deallocDataBlock(int d)
+{
+	char byte;
+	//get the byte for that block in the bitmap
+	lseek(fdImage,BYOFF_BIT(d),SEEK_SET);
+	read(fdImage,&byte,sizeof(char));
+	//clear the bit for the block within that byte
+	clearbit(BIOFF_BIT(d), &byte);
+	//update the bitmap
+	lseek(fdImage,BYOFF_BIT(d),SEEK_SET);
+	write(fdImage,&byte,sizeof(char));
+		
+	//update superblock total and data block
+	super.nblocks--;
+	super.size--;
+	lseek(fdImage, BYOFF_SUPER, SEEK_SET);
+	write(fdImage, &super, sizeof(superblock_t));
+}
+
+//dealloc inode
+int deallocInode(int inum)
+{
+	int i,j;
+	inode_t inode;
+	dir_t dirBlock;
+	//Get to start of inode 
+	lseek(fdImage,BYOFF_INODE(inum),SEEK_SET);
+	//Read the inode
+	read(fdImage, &inode, sizeof(inode_t));
+
+	if(inode.type==MFS_DIRECTORY)//if directory
+	{
+		//should be empty except for the two default entries . ..
+		assert(inode.blockPtrs[0]!=-1);//has to have at least one block
+		
+		for(i=0; i<14; i++)
+		{
+			if(inode.blockPtrs[i]!=-1)//valid blockPtr
+			{
+				//Go to that block
+				lseek(fdImage, inode.blockPtrs[i], SEEK_SET);
+				read(fdImage, &dirBlock, sizeof(dir_t));
+				//Check all entries in the directory block
+				for(j=0; j<NUM_DIR_ENTS; j++)
+				{
+					if( (dirBlock.dirEnt[j].inum != -1) && !(i==0 && j<2) )//valid directory entry which is not one of the first two
+						return -1;//could not deallocate Inode
+				}
+			}
+		}
+		//empty directory
+	}
+	//Either empty directory or simple file
+	inode.type=MFS_UNUSED;//mark it unused
+	//update as unused inode
+	lseek(fdImage,BYOFF_INODE(inum),SEEK_SET);
+	write(fdImage, &inode, sizeof(inode_t));
+	//dealloc all its data blocks
+	for(i=0; i<14; i++)
+	{
+		if(inode.blockPtrs[i]!=-1)//valid ptr
+			deallocDataBlock(BLOCKNUM(inode.blockPtrs[i]));
+	}
+
+	//update superblock inode count
+	super.ninodes--;
+	lseek(fdImage, BYOFF_SUPER, SEEK_SET);
+	write(fdImage, &super, sizeof(superblock_t));
+
+	return 0;
+
+}
+
+
 //Find a free inode number
 int getFreeInum()
 {
@@ -532,11 +607,16 @@ int sUnlink(int pinum, char *name)
 
 	if(nameMatch)//if name did exist then unlink
 	{
-
 		//remove directory entry for this file
 		//Go to the parent directory's data block
 		lseek(fdImage, pinode.blockPtrs[blockPtr], SEEK_SET);
 		read(fdImage, &dirBlock, sizeof(dir_t));
+		
+		//check if that inode is removable
+		int rc = deallocInode(dirBlock.dirEnt[dirEnt].inum);
+		if(rc==-1)
+			return -1;
+		
 		//Remove that directory entry inside it
 		dirBlock.dirEnt[dirEnt].inum=-1;//unused
 		//Write down the updated directory entry data block	

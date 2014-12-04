@@ -100,6 +100,8 @@ typedef struct __msg_t {
 //Bit offset within the byte in bitmap for block b
 #define BIOFF_BIT(b) ( b%8 )
 
+//Data block number form byte offset: 0-1023
+#define BLOCKNUM(offset) (  (offset-4*MFS_BLOCK_SIZE)/MFS_BLOCK_SIZE  )
 
 int MFS_Init(char *hostname, int port);
 int MFS_Lookup(int pinum, char *name);
