@@ -8,7 +8,7 @@ int sd;//socket descriptor
 int fdImage;//file descriptor for disk image
 char imgName[1024];//name of file system image
 struct sockaddr_in addr;
-
+superblock_t super;
 
 
 void initImage(char *imgName);
@@ -90,7 +90,9 @@ int allocDataBlock()
 			{
 				freeBlock= i + j;
 				freeFound=1;
+				printf("Before setbit:%d\n",(int)byte);
 				setbit(j,&byte);//set that bit to used
+				printf("After setbit:%d\n",(int)byte);
 				//write back the byte
 				lseek(fdImage,BYOFF_BIT(i),SEEK_SET);
 				write(fdImage,&byte,sizeof(char));
@@ -104,7 +106,17 @@ int allocDataBlock()
 	if(!freeFound)
 		return -1;//No free block to write on, should not happen
 	else
+	{
+		printf("Free data block found: %d\n",freeBlock);
+
+		//update superblock total and data block
+		super.nblocks++;
+		super.size++;
+		lseek(fdImage, BYOFF_SUPER, SEEK_SET);
+		write(fdImage, &super, sizeof(superblock_t));
 		return freeBlock;
+	}
+
 }
 
 //Find a free inode number
@@ -146,9 +158,35 @@ void dirDataInit(int inum, int pinum, int dirDatNum)
 	//Write the block dirDat over there as the new directory block
 	write(fdImage, &dirDat, sizeof(dir_t));
 
+
 }
 
+inode_t allocInode(int type, int inum, int dirBlock)
+{
+	int i;
+	inode_t inode;
+	for(i=0; i<14; i++)
+		inode.blockPtrs[i]=-1;//data block pointers unassigned
+	inode.type=type;
+	inode.size=0;
+	if(type==MFS_DIRECTORY)
+	{
+		inode.blockPtrs[0]=BYOFF_BLOCK(dirBlock);//first pointer to data block 0
+		printf("Inode:%d blockPtrs[0]:%d points to dirBlock:%d\n",inum,inode.blockPtrs[0], dirBlock);	
+		inode.size=MFS_BLOCK_SIZE;//FIXME Inode size is one data block for root directory entries?
+	}
+	//Get to start of inode 0
+	lseek(fdImage,BYOFF_INODE(inum),SEEK_SET);
+	//Write the root inode
+	write(fdImage, &inode, sizeof(inode_t));
 
+	//update superblock inode count
+	super.ninodes++;
+	lseek(fdImage, BYOFF_SUPER, SEEK_SET);
+	write(fdImage, &super, sizeof(superblock_t));
+
+	return inode;
+}
 
 void initImage(char *imgName)
 {
@@ -162,14 +200,14 @@ void initImage(char *imgName)
 
 		//create new super block
 		superblock_t superblock;
-		superblock.size=5;// 5: 1.unused, 2.superblock, 3.inode-block, 4.bitmap-block, 5.1st data block
-		superblock.nblocks=1;//1 data block to hold root directory entries
-		superblock.ninodes=1;//only root inode
+		superblock.size=4;// 5: 1.unused, 2.superblock, 3.inode-block, 4.bitmap-block, 5.1st data block
+		superblock.nblocks=0;//1 data block to hold root directory entries
+		superblock.ninodes=0;//only root inode
 		//Get to start of superblock
 		lseek(fdImage, BYOFF_SUPER, SEEK_SET);
 		//write the super block
 		write(fdImage, &superblock, sizeof(superblock_t));
-
+		super=superblock;
 
 		//Create all the inodes and mark them as unused
 		lseek(fdImage, BYOFF_INODE(0), SEEK_SET);
@@ -184,36 +222,25 @@ void initImage(char *imgName)
 			write(fdImage, &inode, sizeof(inode_t));
 		}
 
-
-		//Create the root inode
-		inode.type=MFS_DIRECTORY;//type directory
-		inode.blockPtrs[0]=BYOFF_BLOCK(0);//first pointer to data block 0	
-		inode.size=MFS_BLOCK_SIZE;//FIXME Inode size is one data block for root directory entries?
-		//Get to start of inode 0
-		lseek(fdImage,BYOFF_INODE(ROOTINO),SEEK_SET);
-		//Write the root inode
-		write(fdImage, &inode, sizeof(inode_t));
-
-		
 		//Set the datablock bitmap to all zeros
 		char zeroBuffer[MFS_BLOCK_SIZE];
 		memset(zeroBuffer,0, sizeof(zeroBuffer));
 		lseek(fdImage,BYOFF_BIT(0),SEEK_SET);
 		write(fdImage, &zeroBuffer, sizeof(zeroBuffer));
-
-/*
-		//Set the bitmap for the bit of data block 0 just assigned
-		char byte;
-		lseek(fdImage,BYOFF_BIT(0),SEEK_SET);
-		read(fdImage, &byte, sizeof(char));//read the byte
-		setbit(BIOFF_BIT(0),&byte);//set the necessary bit
-		lseek(fdImage,BYOFF_BIT(0),SEEK_SET);
-		write(fdImage, &byte, sizeof(char));//write it back
 		
-*/
+		//Allocate and write the root inode
+		allocInode(MFS_DIRECTORY, ROOTINO, 0);
+		//Find a free data block and set it marked to used in the data bitmap
 		int freeBlock=allocDataBlock();
 		//First root directory data block
 		dirDataInit(ROOTINO, ROOTINO, freeBlock);//initialize with . and ..	
+	
+		//int 
+		//int freeInode=getFreeInum();
+		//allocInode(MFS_DIRECTORY, freeInode, );
+	
+		//Test by another inode
+		printf("Test BYOFF_BLOCK(0):%d BYOFF_BLOCK(1):%d BYOFF_BLOCK(2):%d\n",BYOFF_BLOCK(0), BYOFF_BLOCK(1), BYOFF_BLOCK(2));
 		
 		fsync(fdImage);
 	}
@@ -418,30 +445,24 @@ int sCreat(int pinum, int type, char *name)
 	if(freeInode<0)//no free inode was found then no more space for new files
 		return -1;
 
-	//Create the new inode
-	inode_t inode;
-	inode.type=type;
-	for(i=0; i<14; i++)
-		inode.blockPtrs[i]=-1;
-	inode.size=0;
-	
-	//if directory type then initialize it with . and ..
+	int d=-1;	
+	//if directory type then initialize it with . and .. directory ent
 	if(type==MFS_DIRECTORY)
 	{
-		inode.size=MFS_BLOCK_SIZE;
-		int d = allocDataBlock();
+		d = allocDataBlock();
 		if(d<0)//out of data blocks
 			return -1;
-		inode.blockPtrs[0]=BYOFF_BLOCK(d);
-		dirDataInit(freeInode, pinum, d);		
 		printf("Dir Inode:%d with data block:%d\n",freeInode,d);
 	}
 		
-	//Get to the free inode
-	lseek(fdImage, BYOFF_INODE(freeInode), SEEK_SET);
-	//Write down the new inode there
-	write(fdImage, &inode, sizeof(inode_t));
-
+	//Create the new inode
+	allocInode(type, freeInode, d);
+	if(type==MFS_DIRECTORY)//and initialize it if directory
+	{
+		assert(d!=-1);
+		dirDataInit(freeInode, pinum, d);
+	}
+	
 	//Write the name:inum directory entry
 	//Go to the parent directory's data block
 	lseek(fdImage, pinode.blockPtrs[newBlockPtr], SEEK_SET);
