@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
 {
 	if(argc!=3)
 	{
-		fprintf(stderr,"Usage: server [portnum] [file-system-image]\n");
+		//fprintf(stderr,"Usage: server [portnum] [file-system-image]\n");
 		exit(0);
 	}
 
@@ -90,9 +90,7 @@ int allocDataBlock()
 			{
 				freeBlock= i + j;
 				freeFound=1;
-				printf("Before setbit:%d\n",(int)byte);
 				setbit(j,&byte);//set that bit to used
-				printf("After setbit:%d\n",(int)byte);
 				//write back the byte
 				lseek(fdImage,BYOFF_BIT(i),SEEK_SET);
 				write(fdImage,&byte,sizeof(char));
@@ -107,7 +105,6 @@ int allocDataBlock()
 		return -1;//No free block to write on, should not happen
 	else
 	{
-		printf("Free data block found: %d\n",freeBlock);
 
 		//update superblock total and data block
 		super.nblocks++;
@@ -172,7 +169,7 @@ inode_t allocInode(int type, int inum, int dirBlock)
 	if(type==MFS_DIRECTORY)
 	{
 		inode.blockPtrs[0]=BYOFF_BLOCK(dirBlock);//first pointer to data block 0
-		printf("Inode:%d blockPtrs[0]:%d points to dirBlock:%d\n",inum,inode.blockPtrs[0], dirBlock);	
+		//printf("Inode:%d blockPtrs[0]:%d points to dirBlock:%d\n",inum,inode.blockPtrs[0], dirBlock);	
 		inode.size=MFS_BLOCK_SIZE;//FIXME Inode size is one data block for root directory entries?
 	}
 	//Get to start of inode 0
@@ -240,13 +237,17 @@ void initImage(char *imgName)
 		//allocInode(MFS_DIRECTORY, freeInode, );
 	
 		//Test by another inode
-		printf("Test BYOFF_BLOCK(0):%d BYOFF_BLOCK(1):%d BYOFF_BLOCK(2):%d\n",BYOFF_BLOCK(0), BYOFF_BLOCK(1), BYOFF_BLOCK(2));
+		//printf("Test BYOFF_BLOCK(0):%d BYOFF_BLOCK(1):%d BYOFF_BLOCK(2):%d\n",BYOFF_BLOCK(0), BYOFF_BLOCK(1), BYOFF_BLOCK(2));
 		
 		fsync(fdImage);
 	}
 	else
 	{
 		//Do nothing for now
+		//Get to start of superblock
+		lseek(fdImage, BYOFF_SUPER, SEEK_SET);
+		//read the super block
+		read(fdImage, &super, sizeof(superblock_t));
 	}
 }
 
@@ -390,7 +391,7 @@ int sCreat(int pinum, int type, char *name)
 	if(pinum<0 || pinum>=NUMINODES)
 		return -1;
 	//check name size
-	if(strlen(name) < 1 || strlen(name) >= 60)
+	if(strlen(name) < 1 || strlen(name) > 60)
 		return -1;
 
 	//Get the parent inode
@@ -407,7 +408,7 @@ int sCreat(int pinum, int type, char *name)
 	{
 		if(pinode.blockPtrs[i]!=-1)//valid blockPtr
 		{
-			printf("Parent inode:%d points to blockPtr[%d]:%d\n",pinum,i,pinode.blockPtrs[i]);
+			//printf("Parent inode:%d points to blockPtr[%d]:%d\n",pinum,i,pinode.blockPtrs[i]);
 			//Go to that block
 			lseek(fdImage, pinode.blockPtrs[i], SEEK_SET);
 			read(fdImage, &dirBlock, sizeof(dir_t));
@@ -416,7 +417,7 @@ int sCreat(int pinum, int type, char *name)
 			{
 				if(dirBlock.dirEnt[j].inum!=-1)//valid inode number
 				{
-					printf("Valid directory entry number:%d name:%s and inode num:%d\n",j,dirBlock.dirEnt[j].name,dirBlock.dirEnt[j].inum);
+					//printf("Valid directory entry number:%d name:%s and inode num:%d\n",j,dirBlock.dirEnt[j].name,dirBlock.dirEnt[j].inum);
 					if( strcmp(dirBlock.dirEnt[j].name, name)==0 )//name match
 						return 0;//file or directory name already exists so success
 				}
@@ -424,8 +425,8 @@ int sCreat(int pinum, int type, char *name)
 				{
 					if(newF)//save the first unused dir entry to be overwritten later
 					{
-						printf("Parent inode:%d points to blockPtr[%d]:%d\n",pinum,i,pinode.blockPtrs[i]);
-						printf("Within parent inode the first unused dir ent is %d\n",j);
+						//printf("Parent inode:%d points to blockPtr[%d]:%d\n",pinum,i,pinode.blockPtrs[i]);
+						//printf("Within parent inode the first unused dir ent is %d\n",j);
 						newBlockPtr=i;
 						newDirEnt=j;
 						newF=0;
@@ -452,7 +453,7 @@ int sCreat(int pinum, int type, char *name)
 		d = allocDataBlock();
 		if(d<0)//out of data blocks
 			return -1;
-		printf("Dir Inode:%d with data block:%d\n",freeInode,d);
+		//printf("Dir Inode:%d with data block:%d\n",freeInode,d);
 	}
 		
 	//Create the new inode
@@ -474,7 +475,7 @@ int sCreat(int pinum, int type, char *name)
 	lseek(fdImage, pinode.blockPtrs[newBlockPtr], SEEK_SET);
 	write(fdImage, &dirBlock, sizeof(dir_t));
 
-	printf("New inode number:%d and name:%s and directory blockPtr:%d entry number:%d\n", freeInode, name, newBlockPtr, newDirEnt);
+	//printf("New inode number:%d and name:%s and directory blockPtr:%d entry number:%d\n", freeInode, name, newBlockPtr, newDirEnt);
 	return 0;
 }
 
@@ -482,6 +483,68 @@ int sCreat(int pinum, int type, char *name)
 
 int sUnlink(int pinum, char *name)
 {
+	int i,j;
+	int blockPtr=-1;
+	int dirEnt=-1;
+	int nameMatch=0;
+	//Check if valid pinum
+	if(pinum<0 || pinum>=NUMINODES)
+		return -1;
+	//check name size
+	if(strlen(name) < 1 || strlen(name) > 60)
+		return -1;
+	//check if not unlinking . or ..
+	if(strcmp(name, "..\0")==0 || strcmp(name,".\0")==0)
+		return -1;
+
+	//Get the parent inode
+	lseek(fdImage, BYOFF_INODE(pinum), SEEK_SET);
+	inode_t pinode;
+	read(fdImage, &pinode, sizeof(pinode));
+	//should be a directory
+	if(pinode.type!=MFS_DIRECTORY)
+		return -1;
+
+	//scan through all the names for a match
+	dir_t dirBlock;
+	for(i=0; i<14; i++)
+	{
+		if(pinode.blockPtrs[i]!=-1)//valid blockPtr
+		{
+			//Go to that block
+			lseek(fdImage, pinode.blockPtrs[i], SEEK_SET);
+			read(fdImage, &dirBlock, sizeof(dir_t));
+			//Check all entries in the directory block
+			for(j=0; j<NUM_DIR_ENTS; j++)
+			{
+				if(dirBlock.dirEnt[j].inum!=-1)//valid inode number
+				{
+					if( strcmp(dirBlock.dirEnt[j].name, name)==0 )//name match
+					{
+						nameMatch=1;
+						blockPtr=i;
+						dirEnt=j;
+					}
+				}
+			}
+		}
+	}
+
+	if(nameMatch)//if name did exist then unlink
+	{
+
+		//remove directory entry for this file
+		//Go to the parent directory's data block
+		lseek(fdImage, pinode.blockPtrs[blockPtr], SEEK_SET);
+		read(fdImage, &dirBlock, sizeof(dir_t));
+		//Remove that directory entry inside it
+		dirBlock.dirEnt[dirEnt].inum=-1;//unused
+		//Write down the updated directory entry data block	
+		lseek(fdImage, pinode.blockPtrs[blockPtr], SEEK_SET);
+		write(fdImage, &dirBlock, sizeof(dir_t));
+
+	}
+
 	return 0;
 }
 
