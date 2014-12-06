@@ -389,6 +389,7 @@ int sStat(int inum, MFS_Stat_t *m)
 
 int sWrite(int inum, char *buffer, int block)
 {
+	int i, lastblock;
 	//printf("Got\n%s\n", buffer);
 	int freeBlock=-1;
 	//Invalid inode number
@@ -413,8 +414,17 @@ int sWrite(int inum, char *buffer, int block)
 	
 		//Update the inode
 		inode.blockPtrs[block]=BYOFF_BLOCK(freeBlock);//point to free block
-		inode.size+=MFS_BLOCK_SIZE;//increment the inode size
+		//inode.size+=MFS_BLOCK_SIZE;//increment the inode size
 
+		//update the size to the last assigned block, the linux fs works like this, so go figure
+		lastblock=0;
+		for(i=0; i<14; i++)
+		{
+			if(inode.blockPtrs[i]!=-1 && i>lastblock)
+				lastblock=i;
+		}
+		inode.size=(lastblock+1)*MFS_BLOCK_SIZE;
+		
 		//write to the inode
 		lseek(fdImage, BYOFF_INODE(inum), SEEK_SET);
 		write(fdImage, &inode, sizeof(inode_t));
