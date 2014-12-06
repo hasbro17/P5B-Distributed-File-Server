@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
 
 	initImage(imgName);
 	
-	char buffer[MFS_BLOCK_SIZE];
+	char buffer[sizeof(msg_t)];
 	//Server listening in loop
 	while(1)
 	{
