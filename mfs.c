@@ -93,7 +93,7 @@ int MFS_Write(int inum, char *buffer, int block)
 	msg.inum=inum;
 	msg.block=block;
 	msg.retCode=-1;
-	memcpy(msg.buffer,buffer,sizeof(msg.buffer));
+	memcpy(msg.buffer,buffer,MFS_BLOCK_SIZE);
 
 	send_and_recieve((char*)&msg);
 

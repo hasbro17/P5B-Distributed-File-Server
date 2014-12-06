@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 	int rc=MFS_Init(hostname,portNum);	
 	assert(rc==0);
 	//What to do here to test out the server?
-
+/*
     rc = MFS_Creat(0, MFS_DIRECTORY, "dir2\0");
 	printf("Create dir returned: %d\n",rc);
    
@@ -36,11 +36,11 @@ int main(int argc, char *argv[])
 
 	inum=MFS_Lookup(1,"dir3\0");
 	printf("Lookup dir3 in pinum 1 returned:%d\n",inum);
-    
-	rc = MFS_Creat(2, MFS_REGULAR_FILE, "file1\0");
+*/    
+	rc = MFS_Creat(0, MFS_REGULAR_FILE, "file1\0");
 	printf("Create file returned: %d\n",rc);
 
-
+/*
 	rc=MFS_Unlink(1,"dir3\0");
 	printf("Unlink dir3 returned: %d\n",rc);
 
@@ -62,20 +62,28 @@ int main(int argc, char *argv[])
 
 	rc=MFS_Creat(0, MFS_DIRECTORY, "dir4\0");
 	printf("Create dir4 in inum:%d returned: %d\n",0, rc);
+*/
 
-/*
     char *buff = malloc(4096);
-    sprintf(buff, "File created successfully");
-    rc = MFS_Write(3, buff, 0);
+   	memset(buff, 'A', BUFFER_SIZE);
+   // sprintf(buff, "File created successfully");
+    rc = MFS_Write(1, buff, 0);
     assert(rc == 0);
+
+	printf("%s\n", buff);
+
+	printf("\n\n\n");
     
     char *retBuff = malloc(4096);
-    rc = MFS_Read(3, retBuff, 0);
-    if(strcmp(retBuff, buff) != 0) {
+    rc = MFS_Read(1, retBuff, 0);
+	printf("%s\n", retBuff);
+    if(memcmp(buff, retBuff, BUFFER_SIZE)!=0){
+	//if(strcmp(retBuff, buff) != 0) {
 		printf("Problem\n");
+		MFS_Shutdown();
         exit(-1);
     }
-*/
+
 	MFS_Shutdown();
 	return 0;
 }

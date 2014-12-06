@@ -389,6 +389,8 @@ int sStat(int inum, MFS_Stat_t *m)
 
 int sWrite(int inum, char *buffer, int block)
 {
+	//printf("Got\n%s\n", buffer);
+	int freeBlock=-1;
 	//Invalid inode number
 	if(inum < 0 || inum >=NUMINODES)
 		return -1;
@@ -402,13 +404,13 @@ int sWrite(int inum, char *buffer, int block)
 	//Should be a file
 	if(inode.type!=MFS_REGULAR_FILE)
 		return -1;
-	
 	if(inode.blockPtrs[block]==-1)//write on new block
 	{
 		//allocate a free data block
-		int freeBlock = allocDataBlock();
+		freeBlock = allocDataBlock();
 		if(freeBlock<0)//No free blocks left
 			return -1;
+	
 		//Update the inode
 		inode.blockPtrs[block]=BYOFF_BLOCK(freeBlock);//point to free block
 		inode.size+=MFS_BLOCK_SIZE;//increment the inode size
@@ -426,10 +428,18 @@ int sWrite(int inum, char *buffer, int block)
 	}
 
 	//write to the data block
+	//printf("Writing to inode:%d inode.blockPtrs[%d]=%d\n",inum, block, inode.blockPtrs[block]);
+	//printf("Free block: %d and BYOFF_BLOCK(freeBlock)=%d\n",freeBlock, BYOFF_BLOCK(freeBlock));
 	write(fdImage, buffer, MFS_BLOCK_SIZE);
+	
+	//printf("Wrote down\n%s\n", buffer);
+
+	//printf("\n\n\n");
 	fsync(fdImage);
 	return 0;
 }
+
+
 int sRead(int inum, char *buffer, int block)
 {
 	//Invalid inode number
@@ -443,7 +453,7 @@ int sRead(int inum, char *buffer, int block)
 	lseek(fdImage, BYOFF_INODE(inum), SEEK_SET);
 	read(fdImage, &inode, sizeof(inode_t));	
 	//Should be either file or directory
-	if(inode.type!=MFS_UNUSED)
+	if(inode.type==MFS_UNUSED)
 		return -1;
 	//Should point to a vaild block
 	if(inode.blockPtrs[block]==-1)
@@ -451,7 +461,9 @@ int sRead(int inum, char *buffer, int block)
 
 	//Move to and read that block
 	lseek(fdImage, inode.blockPtrs[block], SEEK_SET);
+	//printf("Reading from inode:%d inode.blockPtrs[%d]=%d\n",inum, block, inode.blockPtrs[block]);
 	read(fdImage, buffer, MFS_BLOCK_SIZE);
+	//printf("Read in\n%s\n", buffer);
 	return 0;
 }
 
@@ -551,6 +563,7 @@ int sCreat(int pinum, int type, char *name)
 	write(fdImage, &dirBlock, sizeof(dir_t));
 
 	//printf("New inode number:%d and name:%s and directory blockPtr:%d entry number:%d\n", freeInode, name, newBlockPtr, newDirEnt);
+	fsync(fdImage);
 	return 0;
 }
 
@@ -645,6 +658,7 @@ void handleRequest(char *buffer)
 			msg->retCode=sStat(msg->inum, &(msg->stat));
 			break;
 		case WRITE:
+			//printf("Got\n%s\n", msg->buffer);
 			msg->retCode=sWrite(msg->inum, msg->buffer, msg->block);
 			break;
 		case READ:
