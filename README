@@ -1,0 +1,14 @@
+Name: Swapnil Haria
+CSL-ID: swapnilh
+Name: Haseeb Tariq
+CSL-ID: haseeb
+(Leave the second name and ID blank if working alone)
+
+Linux-Implementation Details:
+The project is a file server which comprises of two parts. The first part is a client library that is exported for the client to use the file server which enforces the message standard defined in mfs.h and the network protocol in udp.h.
+The file server implemented is server.c manages a very simple file system that that comprises of a superblock, inodes block, data bitmap block, and data blocks appended to that. The block size and other standards are defined in mfs.h
+and some arithmetic translations to find byte offsets for inodes and data blocks are also included. 
+All the client requests are handled such that they are idempotent so for instance if a client requests the creation of directory that already exists the server will simply return true for that. So even if client requests are lost they can just be retried and the filesystem will still be consistent with the client's expectations.
+
+XV6-Implementation Details:
+
